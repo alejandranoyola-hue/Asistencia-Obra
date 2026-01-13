@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ASISTENCIA OBRA</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f2f2f2;margin:0}
+header{background:#1f2933;color:white;padding:15px;text-align:center;font-size:20px;font-weight:bold}
+.container{padding:15px;max-width:1000px;margin:auto}
+.card{background:white;border-radius:10px;padding:15px;margin-bottom:15px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+button{padding:10px 15px;border:none;border-radius:6px;font-weight:bold;cursor:pointer}
+.btn-primary{background:#2563eb;color:white}
+.btn-danger{background:#dc2626;color:white}
+.floating-btn{position:fixed;bottom:20px;right:20px;background:#111827;color:white;border-radius:50%;width:60px;height:60px;font-size:12px}
+.hidden{display:none}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;font-size:14px}
+th{background:#e5e7eb}
+</style>
+</head>
+<body>
+<header>CONTROL DE ASISTENCIA OBRA</header>
+
+<div class="container">
+<div id="statusCard" class="card"></div>
+
+<div id="panelSupervisor" class="card hidden">
+<h3>PANEL SUPERVISOR</h3>
+<table id="tabla">
+<thead>
+<tr><th>ID</th><th>NOMBRE</th><th>FECHA</th><th>HORA</th><th>ELIMINAR</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+<br>
+<button class="btn-primary" onclick="exportarExcel()">DESCARGAR REPORTE EXCEL</button>
+</div>
+</div>
+
+<button class="floating-btn" onclick="activarSupervisor()">SUP</button>
+
+<script>
+// ===== CONFIG =====
+const CODIGO_SUPERVISOR = "NGC";
+const TIEMPO_CODIGO = 10*60*1000; //10 min
+
+// ===== EMPLEADOS =====
+const empleados = {
+"EMP001":"ENEDINO RODRIGUEZ TELLEZ",
+"EMP002":"JOSE YAÑEZ GONZALEZ",
+"EMP003":"ERICK RODRIGUEZ HERNANDEZ",
+"EMP004":"CRISTIAN CRUZ GONZALEZ",
+"EMP005":"FERNANDO GARDUÑO PRIMERO",
+"EMP006":"JUAN CARLOS GONZALEZ RODRIGUEZ",
+"EMP007":"VICENTE CORTEZ HERNANDEZ",
+"EMP008":"DANNY PAUL RAZO COVARRUBIAS",
+"EMP009":"ANGEL ADOLFO BARRIOS RIVERA",
+"EMP010":"IGNACIO SANTIZ GIRON"
+};
+
+// ===== CODIGO DIARIO =====
+function generarCodigoDiario(){
+ let d=new Date();
+ let dd=String(d.getDate()).padStart(2,"0");
+ let mm=String(d.getMonth()+1).padStart(2,"0");
+ return "OBRA"+dd+mm;
+}
+
+function pedirCodigoDiario(callback){
+ let c=prompt("INGRESA EL CÓDIGO DEL DÍA");
+ if(c===generarCodigoDiario()){
+   sessionStorage.setItem("dailyAuth",Date.now());
+   status("CÓDIGO DEL DÍA ACEPTADO");
+   callback();
+ }else{
+   alert("CÓDIGO DEL DÍA INCORRECTO");
+ }
+}
+
+function codigoDiarioActivo(){
+ let t=sessionStorage.getItem("dailyAuth");
+ if(!t) return false;
+ if(Date.now()-t>TIEMPO_CODIGO){
+   sessionStorage.removeItem("dailyAuth");
+   return false;
+ }
+ return true;
+}
+
+// ===== ASISTENCIAS =====
+function getAsistencias(){
+ return JSON.parse(localStorage.getItem("asistencias")||"[]");
+}
+function saveAsistencias(a){
+ localStorage.setItem("asistencias",JSON.stringify(a));
+}
+
+function registrar(emp){
+ let hoy=new Date().toLocaleDateString();
+ let ahora=new Date().toLocaleTimeString();
+ let asist=getAsistencias();
+
+ if(asist.find(x=>x.id===emp && x.fecha===hoy)){
+   status("YA REGISTRADO HOY: "+empleados[emp]);
+   return;
+ }
+
+ asist.push({id:emp,nombre:empleados[emp],fecha:hoy,hora:ahora});
+ saveAsistencias(asist);
+ status("ASISTENCIA REGISTRADA: "+empleados[emp]);
+}
+
+// ===== SUPERVISOR =====
+function activarSupervisor(){
+ let c=prompt("INGRESA CÓDIGO SUPERVISOR");
+ if(c===CODIGO_SUPERVISOR){
+   document.getElementById("panelSupervisor").classList.remove("hidden");
+   cargarTabla();
+   status("PANEL SUPERVISOR ACTIVADO");
+ }else alert("CÓDIGO SUPERVISOR INCORRECTO");
+}
+
+function eliminar(i){
+ let a=getAsistencias();
+ a.splice(i,1);
+ saveAsistencias(a);
+ cargarTabla();
+}
+
+function cargarTabla(){
+ let asist=getAsistencias();
+ let tbody=document.querySelector("#tabla tbody");
+ tbody.innerHTML="";
+ asist.forEach((a,i)=>{
+  let tr=document.createElement("tr");
+  tr.innerHTML=`<td>${a.id}</td><td>${a.nombre}</td><td>${a.fecha}</td><td>${a.hora}</td><td><button class='btn-danger' onclick='eliminar(${i})'>X</button></td>`;
+  tbody.appendChild(tr);
+ });
+}
+
+// ===== EXCEL =====
+function exportarExcel(){
+ let asist=getAsistencias();
+ let wb=XLSX.utils.book_new();
+ let ws=XLSX.utils.json_to_sheet(asist);
+ XLSX.utils.book_append_sheet(wb,ws,"ASISTENCIA");
+ XLSX.writeFile(wb,"REPORTE_ASISTENCIA.xlsx");
+}
+
+function status(t){document.getElementById("statusCard").innerHTML="<b>"+t+"</b>";}
+
+// ===== PROCESO QR =====
+function procesarQR(){
+ let params=new URLSearchParams(window.location.search);
+ let emp=params.get("emp");
+ if(!emp||!empleados[emp]) return;
+
+ if(!codigoDiarioActivo()){
+   pedirCodigoDiario(()=>registrar(emp));
+ }else{
+   registrar(emp);
+ }
+}
+
+// ===== INIT =====
+window.onload=function(){
+ status("CÓDIGO DEL DÍA: "+generarCodigoDiario());
+ procesarQR();
+}
+</script>
+</body>
+</html>
