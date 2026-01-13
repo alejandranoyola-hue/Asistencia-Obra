@@ -61,10 +61,11 @@ function registrarAsistencia(emp){
   const ahora = new Date();
   const registros = obtenerRegistros();
 
-  let texto = decodeURIComponent(emp).trim();
+  let texto = decodeURIComponent(emp).trim().toUpperCase();
 
-  // FORMATO QR: EMP001-NOMBRE DEL EMPLEADO
-  let clave = texto.split("-")[0].trim();
+  // EXTRAER CLAVE EMP### DESDE CUALQUIER FORMATO
+  let match = texto.match(/EMP\d+/);
+  let clave = match ? match[0] : texto;
 
   let nombre = empleados[clave] || "DESCONOCIDO";
 
@@ -77,7 +78,8 @@ function registrarAsistencia(emp){
 
   guardarRegistros(registros);
 
-  document.getElementById("msg").innerText = `ASISTENCIA REGISTRADA: ${clave}`;
+  document.getElementById("msg").innerText =
+    `ASISTENCIA REGISTRADA: ${clave} - ${nombre}`;
 }
 
   if(!nombre) nombre = "DESCONOCIDO";
