@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Asistencia por QR (Sin Cámara)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:20px; }
+    .card { max-width:1000px; margin:auto; background:#fff; padding:20px; border-radius:14px; box-shadow:0 6px 12px rgba(0,0,0,.1);}    
+    h1 { text-align:center; }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    th,td { border:1px solid #ccc; padding:8px; text-align:center; }
+    th { background:#e9ecef; }
+    .actions { margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+    button { padding:10px 16px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-weight:bold; cursor:pointer; }
+    button:hover { background:#1e4ed8; }
+    .ok { color:green; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>SISTEMA DE ASISTENCIA POR QR</h1>
+  <p style="text-align:center">ESCANEA TU QR Y SE REGISTRA AUTOMÁTICAMENTE</p>
+
+  <table id="tabla">
+    <thead>
+      <tr>
+        <th>No.</th>
+        <th>ID / NOMBRE</th>
+        <th>FECHA</th>
+        <th>HORA</th>
+        <th>ASISTENCIA</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="actions">
+    <button onclick="exportarExcel()">EXPORTAR A EXCEL</button>
+    <button onclick="reporteSemanal()">REPORTE SEMANAL</button>
+    <button onclick="limpiar()">LIMPIAR LISTA</button>
+  </div>
+</div>
+
+<script>
+  const tbody = document.querySelector("#tabla tbody");
+
+  function marcarAsistencia(texto) {
+    const now = new Date();
+    const fecha = now.toLocaleDateString();
+    const hora = now.toLocaleTimeString();
+
+    for (let row of tbody.rows) {
+      if (row.cells[1].innerText === texto && row.cells[2].innerText === fecha) return;
+    }
+
+    const row = tbody.insertRow();
+    row.innerHTML = `
+      <td>${tbody.rows.length}</td>
+      <td>${texto}</td>
+      <td>${fecha}</td>
+      <td>${hora}</td>
+      <td class="ok">✔</td>
+    `;
+
+    guardarLocal();
+  }
+
+  function guardarLocal(){
+    localStorage.setItem("lista_qr", tbody.innerHTML);
+  }
+
+  function cargar(){
+    const data = localStorage.getItem("lista_qr");
+    if(data) tbody.innerHTML = data;
+  }
+
+  function limpiar(){
+    if(confirm("¿Borrar todos los registros?")){
+      tbody.innerHTML = "";
+      localStorage.removeItem("lista_qr");
+    }
+  }
+
+  function exportarExcel(){
+    const data = [];
+    for(let row of tbody.rows){
+      data.push([
+        row.cells[1].innerText,
+        row.cells[2].innerText,
+        row.cells[3].innerText,
+        "ASISTIO"
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([["EMPLEADO","FECHA","HORA","ESTADO"], ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
+    XLSX.writeFile(wb, "asistencia.xlsx");
+  }
+
+  function obtenerSemana(fecha) {
+    const d = new Date(fecha);
+    const onejan = new Date(d.getFullYear(),0,1);
+    return Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
+  }
+
+  function reporteSemanal(){
+    const resumen = {};
+
+    for(let row of tbody.rows){
+      const nombre = row.cells[1].innerText;
+      const fecha = new Date(row.cells[2].innerText);
+      const semana = obtenerSemana(fecha);
+
+      if(!resumen[nombre]) resumen[nombre] = {};
+      if(!resumen[nombre][semana]) resumen[nombre][semana] = 0;
+      resumen[nombre][semana]++;
+    }
+
+    const data = [["EMPLEADO","SEMANA","ASISTENCIAS"]];
+
+    for(let emp in resumen){
+      for(let sem in resumen[emp]){
+        data.push([emp, sem, resumen[emp][sem]]);
+      }
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte Semanal");
+    XLSX.writeFile(wb, "reporte_semanal.xlsx");
+  }
+
+  // LEE EL QR DESDE LA URL
+  function leerQRdesdeURL(){
+    const params = new URLSearchParams(window.location.search);
+    const empleado = params.get("emp");
+    if(empleado){
+      marcarAsistencia(empleado);
+    }
+  }
+
+  cargar();
+  leerQRdesdeURL();
+</script>
+
+<!-- PANEL DE SUPERVISOR -->
+<div id="panelSupervisor" style="max-width:900px;margin:40px auto;padding:20px;border:2px solid #444;border-radius:10px;display:none;">
+  <h2>PANEL DE SUPERVISOR</h2>
+  <button onclick="mostrarRegistros()">VER REGISTROS</button>
+  <button onclick="exportarExcelSemanal()">DESCARGAR REPORTE SEMANAL (EXCEL)</button>
+  <table id="tablaRegistros" border="1" cellpadding="6" style="margin-top:15px;width:100%;border-collapse:collapse;"></table>
+</div>
+
+<script>
+// --- ACTIVAR PANEL SUPERVISOR ---
+function activarSupervisor(){
+  const clave = prompt("INGRESA CÓDIGO DE SUPERVISOR:");
+  if(clave === "SPERVISORNGC"){
+    document.getElementById("panelSupervisor").style.display = "block";
+  } else {
+    alert("CÓDIGO DE SUPERVISOR INCORRECTO");
+  }
+}
+
+// BOTÓN OCULTO PARA SUPERVISOR
+const btnSup = document.createElement("button");
+btnSup.innerText = "MODO SUPERVISOR";
+btnSup.style.position="fixed";
+btnSup.style.bottom="10px";
+btnSup.style.right="10px";
+btnSup.onclick = activarSupervisor;
+document.body.appendChild(btnSup);
+
+// --- MOSTRAR REGISTROS ---
+function mostrarRegistros(){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  let html = "<tr><th>EMPLEADO</th><th>FECHA</th><th>HORA</th><th>ACCION</th></tr>";
+  datos.forEach((r,i)=>{
+    html += `<tr><td>${r.emp}</td><td>${r.fecha}</td><td>${r.hora}</td><td><button onclick=\"borrarRegistro(${i})\">BORRAR</button></td></tr>`;
+  });
+  document.getElementById("tablaRegistros").innerHTML = html;
+}
+
+// --- BORRAR SOLO UN REGISTRO ---
+function borrarRegistro(index){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  if(confirm("¿BORRAR ESTE REGISTRO?")){
+    datos.splice(index,1);
+    localStorage.setItem("registros",JSON.stringify(datos));
+    mostrarRegistros();
+  }
+}
+
+// --- EXPORTAR EXCEL SEMANAL ---
+function exportarExcelSemanal(){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  const hoy = new Date();
+  const hace7 = new Date(hoy.getTime()-7*24*60*60*1000);
+
+  const filtrados = datos.filter(r=> new Date(r.fecha) >= hace7);
+
+  let csv = "EMPLEADO,FECHA,HORA
+";
+  filtrados.forEach(r=>{
+    csv += `${r.emp},${r.fecha},${r.hora}
+`;
+  });
+
+  const blob = new Blob([csv],{type:"text/csv"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "reporte_semanal.csv";
+  link.click();
+}
+</script>
+
+</body>
+</html>
