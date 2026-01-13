@@ -149,5 +149,76 @@
   leerQRdesdeURL();
 </script>
 
+<!-- PANEL DE SUPERVISOR -->
+<div id="panelSupervisor" style="max-width:900px;margin:40px auto;padding:20px;border:2px solid #444;border-radius:10px;display:none;">
+  <h2>PANEL DE SUPERVISOR</h2>
+  <button onclick="mostrarRegistros()">VER REGISTROS</button>
+  <button onclick="exportarExcelSemanal()">DESCARGAR REPORTE SEMANAL (EXCEL)</button>
+  <table id="tablaRegistros" border="1" cellpadding="6" style="margin-top:15px;width:100%;border-collapse:collapse;"></table>
+</div>
+
+<script>
+// --- ACTIVAR PANEL SUPERVISOR ---
+function activarSupervisor(){
+  const clave = prompt("INGRESA CÓDIGO DE SUPERVISOR:");
+  if(clave === "SPERVISORNGC"){
+    document.getElementById("panelSupervisor").style.display = "block";
+  } else {
+    alert("CÓDIGO DE SUPERVISOR INCORRECTO");
+  }
+}
+
+// BOTÓN OCULTO PARA SUPERVISOR
+const btnSup = document.createElement("button");
+btnSup.innerText = "MODO SUPERVISOR";
+btnSup.style.position="fixed";
+btnSup.style.bottom="10px";
+btnSup.style.right="10px";
+btnSup.onclick = activarSupervisor;
+document.body.appendChild(btnSup);
+
+// --- MOSTRAR REGISTROS ---
+function mostrarRegistros(){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  let html = "<tr><th>EMPLEADO</th><th>FECHA</th><th>HORA</th><th>ACCION</th></tr>";
+  datos.forEach((r,i)=>{
+    html += `<tr><td>${r.emp}</td><td>${r.fecha}</td><td>${r.hora}</td><td><button onclick=\"borrarRegistro(${i})\">BORRAR</button></td></tr>`;
+  });
+  document.getElementById("tablaRegistros").innerHTML = html;
+}
+
+// --- BORRAR SOLO UN REGISTRO ---
+function borrarRegistro(index){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  if(confirm("¿BORRAR ESTE REGISTRO?")){
+    datos.splice(index,1);
+    localStorage.setItem("registros",JSON.stringify(datos));
+    mostrarRegistros();
+  }
+}
+
+// --- EXPORTAR EXCEL SEMANAL ---
+function exportarExcelSemanal(){
+  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
+  const hoy = new Date();
+  const hace7 = new Date(hoy.getTime()-7*24*60*60*1000);
+
+  const filtrados = datos.filter(r=> new Date(r.fecha) >= hace7);
+
+  let csv = "EMPLEADO,FECHA,HORA
+";
+  filtrados.forEach(r=>{
+    csv += `${r.emp},${r.fecha},${r.hora}
+`;
+  });
+
+  const blob = new Blob([csv],{type:"text/csv"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "reporte_semanal.csv";
+  link.click();
+}
+</script>
+
 </body>
 </html>
