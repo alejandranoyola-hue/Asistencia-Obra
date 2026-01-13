@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>ASISTENCIA POR QR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f6f8;margin:0;padding:20px}
+.container{max-width:900px;margin:auto;background:white;padding:20px;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,.1)}
+h1{text-align:center}
+button{padding:10px 15px;border:none;border-radius:6px;background:#007bff;color:white;font-weight:bold;cursor:pointer}
+button.danger{background:#dc3545}
+button.gray{background:#6c757d}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th,td{border:1px solid #ccc;padding:8px;text-align:center}
+th{background:#eee}
+#msg{margin-top:15px;font-weight:bold;text-align:center}
+.actions{margin-top:15px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>SISTEMA DE ASISTENCIA QR</h1>
+
+<div id="msg"></div>
+
+<div class="actions">
+<button onclick="exportarExcel()">EXPORTAR EXCEL</button>
+<button onclick="reporteSemanal()">REPORTE SEMANAL</button>
+<button class="gray" onclick="mostrarTabla()">VER REGISTROS</button>
+</div>
+
+<div id="tabla"></div>
+</div>
+
+<script>
+const CODIGO_SUPERVISOR = "NGC";
+
+const empleados = {
+  "EMP001":"ENEDINO RODRIGUEZ TELLEZ",
+  "EMP002":"JOSE YAÑEZ GONZALEZ",
+  "EMP003":"ERICK RODRIGUEZ HERNANDEZ",
+  "EMP004":"CRISTIAN CRUZ GONZALEZ",
+  "EMP005":"FERNANDO GARDUÑO PRIMERO",
+  "EMP006":"JUAN CARLOS GONZALEZ RODRIGUEZ",
+  "EMP007":"VICENTE CORTEZ HERNANDEZ",
+  "EMP008":"DANNY PAUL RAZO COVARRUBIAS",
+  "EMP009":"ANGEL ADOLFO BARRIOS RIVERA",
+  "EMP010":"IGNACIO SANTIZ GIRON"
+};
+
+function obtenerRegistros(){
+  return JSON.parse(localStorage.getItem("asistencias")||"[]");
+}
+
+function guardarRegistros(arr){
+  localStorage.setItem("asistencias",JSON.stringify(arr));
+}
+
+// ===== REGISTRO AUTOMÁTICO QR (VERSIÓN INFALIBLE) =====
+function registrarAsistencia(emp){
+  const ahora = new Date();
+  const registros = obtenerRegistros();
+
+  let texto = decodeURIComponent(emp).trim().toUpperCase();
+
+  // EXTRAER CLAVE EMP### DESDE CUALQUIER FORMATO
+  let match = texto.match(/EMP\d+/);
+  let clave = match ? match[0] : texto;
+
+  let nombre = empleados[clave] || "DESCONOCIDO";
+
+  registros.push({
+    emp: clave,
+    nombre: nombre,
+    fecha: ahora.toLocaleDateString(),
+    hora: ahora.toLocaleTimeString()
+  });
+
+  guardarRegistros(registros);
+
+  document.getElementById("msg").innerText = `ASISTENCIA REGISTRADA: ${clave} - ${nombre}`;
+}
+
+function mostrarTabla(){
+  const registros = obtenerRegistros();
+  let html = "<table><tr><th>#</th><th>EMP</th><th>NOMBRE</th><th>FECHA</th><th>HORA</th><th>ACCION</th></tr>";
+
+  registros.forEach((r,i)=>{
+    html += `<tr><td>${i+1}</td><td>${r.emp}</td><td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td><td><button class='danger' onclick='borrarRegistro(${i})'>BORRAR</button></td></tr>`;
+  });
+
+  html += "</table>";
+  document.getElementById("tabla").innerHTML = html;
+}
+
+function borrarRegistro(index){
+  const codigo = prompt("INGRESA CODIGO SUPERVISOR");
+  if(codigo !== CODIGO_SUPERVISOR){
+    alert("CODIGO INCORRECTO");
+    return;
+  }
+
+  const registros = obtenerRegistros();
+  registros.splice(index,1);
+  guardarRegistros(registros);
+  mostrarTabla();
+}
+
+function exportarExcel(){
+  const registros = obtenerRegistros();
+  let csv = "EMP,NOMBRE,FECHA,HORA\n";
+
+  registros.forEach(r=>{
+    csv += `${r.emp},${r.nombre},${r.fecha},${r.hora}\n`;
+  });
+
+  const blob = new Blob([csv],{type:"text/csv"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "asistencia.csv";
+  link.click();
+}
+
+function reporteSemanal(){
+  const registros = obtenerRegistros();
+  const hoy = new Date();
+  const semana = registros.filter(r=>{
+    const f = new Date(r.fecha);
+    const diff = (hoy - f) / (1000*60*60*24);
+    return diff <= 7;
+  });
+
+  let html = "<h3>REPORTE SEMANAL</h3><table><tr><th>EMP</th><th>NOMBRE</th><th>FECHA</th><th>HORA</th></tr>";
+  semana.forEach(r=>{
+    html += `<tr><td>${r.emp}</td><td>${r.nombre}</td><td>${r.fecha}</td><td>${r.hora}</td></tr>`;
+  });
+  html += "</table>";
+  document.getElementById("tabla").innerHTML = html;
+}
+
+// ===== REGISTRO AUTOMATICO POR QR =====
+document.addEventListener("DOMContentLoaded",()=>{
+  const params = new URLSearchParams(window.location.search);
+  const emp = params.get("emp");
+  if(emp){
+    registrarAsistencia(emp);
+  }else{
+    document.getElementById("msg").innerText = "LISTO PARA ESCANEAR QR";
+  }
+});
+</script>
+</body>
+</html>
