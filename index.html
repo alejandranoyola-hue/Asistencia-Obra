@@ -1,224 +1,168 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Asistencia por QR (Sin Cámara)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <style>
-    body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:20px; }
-    .card { max-width:1000px; margin:auto; background:#fff; padding:20px; border-radius:14px; box-shadow:0 6px 12px rgba(0,0,0,.1);}    
-    h1 { text-align:center; }
-    table { width:100%; border-collapse:collapse; margin-top:20px; }
-    th,td { border:1px solid #ccc; padding:8px; text-align:center; }
-    th { background:#e9ecef; }
-    .actions { margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-    button { padding:10px 16px; border:none; border-radius:10px; background:#2563eb; color:#fff; font-weight:bold; cursor:pointer; }
-    button:hover { background:#1e4ed8; }
-    .ok { color:green; font-weight:bold; }
-  </style>
+<meta charset="UTF-8">
+<title>ASISTENCIA OBRA - SUPERVISOR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f2f2f2;margin:0;padding:0}
+header{background:#1f2933;color:white;padding:15px;text-align:center;font-size:20px;font-weight:bold}
+.container{padding:15px;max-width:1000px;margin:auto}
+.card{background:white;border-radius:10px;padding:15px;margin-bottom:15px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+button{padding:10px 15px;border:none;border-radius:6px;font-weight:bold;cursor:pointer}
+.btn-primary{background:#2563eb;color:white}
+.btn-danger{background:#dc2626;color:white}
+.btn-secondary{background:#374151;color:white}
+input{padding:10px;border-radius:6px;border:1px solid #ccc;width:100%;margin-top:8px}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{border:1px solid #ccc;padding:8px;text-align:center;font-size:14px}
+th{background:#e5e7eb}
+.floating-btn{position:fixed;bottom:20px;right:20px;background:#111827;color:white;border-radius:50%;width:60px;height:60px;font-size:12px}
+</style>
 </head>
 <body>
+<header>CONTROL DE ASISTENCIA OBRA</header>
+
+<div class="container">
+
+<div id="statusCard" class="card"></div>
 
 <div class="card">
-  <h1>SISTEMA DE ASISTENCIA POR QR</h1>
-  <p style="text-align:center">ESCANEA TU QR Y SE REGISTRA AUTOMÁTICAMENTE</p>
-
-  <table id="tabla">
-    <thead>
-      <tr>
-        <th>No.</th>
-        <th>ID / NOMBRE</th>
-        <th>FECHA</th>
-        <th>HORA</th>
-        <th>ASISTENCIA</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="actions">
-    <button onclick="exportarExcel()">EXPORTAR A EXCEL</button>
-    <button onclick="reporteSemanal()">REPORTE SEMANAL</button>
-    <button onclick="limpiar()">LIMPIAR LISTA</button>
-  </div>
+<h3>REGISTROS DE HOY</h3>
+<table id="tabla">
+<thead>
+<tr><th>ID</th><th>NOMBRE</th><th>FECHA</th><th>HORA</th><th>ELIMINAR</th></tr>
+</thead>
+<tbody></tbody>
+</table>
 </div>
 
-<script>
-  const tbody = document.querySelector("#tabla tbody");
-
-  function marcarAsistencia(texto) {
-    const now = new Date();
-    const fecha = now.toLocaleDateString();
-    const hora = now.toLocaleTimeString();
-
-    for (let row of tbody.rows) {
-      if (row.cells[1].innerText === texto && row.cells[2].innerText === fecha) return;
-    }
-
-    const row = tbody.insertRow();
-    row.innerHTML = `
-      <td>${tbody.rows.length}</td>
-      <td>${texto}</td>
-      <td>${fecha}</td>
-      <td>${hora}</td>
-      <td class="ok">✔</td>
-    `;
-
-    guardarLocal();
-  }
-
-  function guardarLocal(){
-    localStorage.setItem("lista_qr", tbody.innerHTML);
-  }
-
-  function cargar(){
-    const data = localStorage.getItem("lista_qr");
-    if(data) tbody.innerHTML = data;
-  }
-
-  function limpiar(){
-    if(confirm("¿Borrar todos los registros?")){
-      tbody.innerHTML = "";
-      localStorage.removeItem("lista_qr");
-    }
-  }
-
-  function exportarExcel(){
-    const data = [];
-    for(let row of tbody.rows){
-      data.push([
-        row.cells[1].innerText,
-        row.cells[2].innerText,
-        row.cells[3].innerText,
-        "ASISTIO"
-      ]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet([["EMPLEADO","FECHA","HORA","ESTADO"], ...data]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
-    XLSX.writeFile(wb, "asistencia.xlsx");
-  }
-
-  function obtenerSemana(fecha) {
-    const d = new Date(fecha);
-    const onejan = new Date(d.getFullYear(),0,1);
-    return Math.ceil((((d - onejan) / 86400000) + onejan.getDay()+1)/7);
-  }
-
-  function reporteSemanal(){
-    const resumen = {};
-
-    for(let row of tbody.rows){
-      const nombre = row.cells[1].innerText;
-      const fecha = new Date(row.cells[2].innerText);
-      const semana = obtenerSemana(fecha);
-
-      if(!resumen[nombre]) resumen[nombre] = {};
-      if(!resumen[nombre][semana]) resumen[nombre][semana] = 0;
-      resumen[nombre][semana]++;
-    }
-
-    const data = [["EMPLEADO","SEMANA","ASISTENCIAS"]];
-
-    for(let emp in resumen){
-      for(let sem in resumen[emp]){
-        data.push([emp, sem, resumen[emp][sem]]);
-      }
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte Semanal");
-    XLSX.writeFile(wb, "reporte_semanal.xlsx");
-  }
-
-  // LEE EL QR DESDE LA URL
-  function leerQRdesdeURL(){
-    const params = new URLSearchParams(window.location.search);
-    const empleado = params.get("emp");
-    if(empleado){
-      marcarAsistencia(empleado);
-    }
-  }
-
-  cargar();
-  leerQRdesdeURL();
-</script>
-
-<!-- PANEL DE SUPERVISOR -->
-<div id="panelSupervisor" style="max-width:900px;margin:40px auto;padding:20px;border:2px solid #444;border-radius:10px;display:none;">
-  <h2>PANEL DE SUPERVISOR</h2>
-  <button onclick="mostrarRegistros()">VER REGISTROS</button>
-  <button onclick="exportarExcelSemanal()">DESCARGAR REPORTE SEMANAL (EXCEL)</button>
-  <table id="tablaRegistros" border="1" cellpadding="6" style="margin-top:15px;width:100%;border-collapse:collapse;"></table>
+<div class="card">
+<button class="btn-primary" onclick="exportarExcel()">DESCARGAR REPORTE SEMANAL EXCEL</button>
 </div>
 
+</div>
+
+<button class="floating-btn" onclick="forzarCodigo()">SUP</button>
+
 <script>
-// --- ACTIVAR PANEL SUPERVISOR ---
-function activarSupervisor(){
-  const clave = prompt("INGRESA CÓDIGO DE SUPERVISOR:");
-  if(clave === "SPERVISORNGC"){
-    document.getElementById("panelSupervisor").style.display = "block";
-  } else {
-    alert("CÓDIGO DE SUPERVISOR INCORRECTO");
-  }
+// ================= CONFIG =================
+const CODIGO_SUPERVISOR = "SPERVISORNGC";
+const TIEMPO_SESION = 10 * 60 * 1000; // 10 minutos
+
+// ================= EMPLEADOS =================
+const empleados = {
+"EMP001":"ENEDINO RODRIGUEZ TELLEZ",
+"EMP002":"JOSE YAÑEZ GONZALEZ",
+"EMP003":"ERICK RODRIGUEZ HERNANDEZ",
+"EMP004":"CRISTIAN CRUZ GONZALEZ",
+"EMP005":"FERNANDO GARDUÑO PRIMERO",
+"EMP006":"JUAN CARLOS GONZALEZ RODRIGUEZ",
+"EMP007":"VICENTE CORTEZ HERNANDEZ",
+"EMP008":"DANNY PAUL RAZO COVARRUBIAS",
+"EMP009":"ANGEL ADOLFO BARRIOS RIVERA",
+"EMP010":"IGNACIO SANTIZ GIRON"
+};
+
+// ================= SEGURIDAD =================
+function pedirCodigo(){
+ let c = prompt("INGRESA CÓDIGO DE SUPERVISOR");
+ if(c === CODIGO_SUPERVISOR){
+   sessionStorage.setItem("authTime",Date.now());
+   return true;
+ }
+ alert("CÓDIGO INCORRECTO");
+ return false;
 }
 
-// BOTÓN OCULTO PARA SUPERVISOR
-const btnSup = document.createElement("button");
-btnSup.innerText = "MODO SUPERVISOR";
-btnSup.style.position="fixed";
-btnSup.style.bottom="10px";
-btnSup.style.right="10px";
-btnSup.onclick = activarSupervisor;
-document.body.appendChild(btnSup);
-
-// --- MOSTRAR REGISTROS ---
-function mostrarRegistros(){
-  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
-  let html = "<tr><th>EMPLEADO</th><th>FECHA</th><th>HORA</th><th>ACCION</th></tr>";
-  datos.forEach((r,i)=>{
-    html += `<tr><td>${r.emp}</td><td>${r.fecha}</td><td>${r.hora}</td><td><button onclick=\"borrarRegistro(${i})\">BORRAR</button></td></tr>`;
-  });
-  document.getElementById("tablaRegistros").innerHTML = html;
+function validarSesion(){
+ let t = sessionStorage.getItem("authTime");
+ if(!t) return pedirCodigo();
+ if(Date.now()-t > TIEMPO_SESION){
+   sessionStorage.removeItem("authTime");
+   return pedirCodigo();
+ }
+ return true;
 }
 
-// --- BORRAR SOLO UN REGISTRO ---
-function borrarRegistro(index){
-  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
-  if(confirm("¿BORRAR ESTE REGISTRO?")){
-    datos.splice(index,1);
-    localStorage.setItem("registros",JSON.stringify(datos));
-    mostrarRegistros();
-  }
+function forzarCodigo(){
+ sessionStorage.removeItem("authTime");
+ pedirCodigo();
 }
 
-// --- EXPORTAR EXCEL SEMANAL ---
-function exportarExcelSemanal(){
-  const datos = JSON.parse(localStorage.getItem("registros")||"[]");
-  const hoy = new Date();
-  const hace7 = new Date(hoy.getTime()-7*24*60*60*1000);
+setInterval(()=>{
+ validarSesion();
+}, TIEMPO_SESION);
 
-  const filtrados = datos.filter(r=> new Date(r.fecha) >= hace7);
-
-  let csv = "EMPLEADO,FECHA,HORA
-";
-  filtrados.forEach(r=>{
-    csv += `${r.emp},${r.fecha},${r.hora}
-`;
-  });
-
-  const blob = new Blob([csv],{type:"text/csv"});
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "reporte_semanal.csv";
-  link.click();
+// ================= ASISTENCIAS =================
+function getAsistencias(){
+ return JSON.parse(localStorage.getItem("asistencias")||"[]");
 }
+
+function saveAsistencias(a){
+ localStorage.setItem("asistencias",JSON.stringify(a));
+}
+
+function registrar(emp){
+ let hoy = new Date().toLocaleDateString();
+ let ahora = new Date().toLocaleTimeString();
+ let asist = getAsistencias();
+
+ let existe = asist.find(x=>x.id===emp && x.fecha===hoy);
+ if(existe){
+   status("YA REGISTRADO HOY: "+empleados[emp]);
+   return;
+ }
+
+ asist.push({id:emp,nombre:empleados[emp],fecha:hoy,hora:ahora});
+ saveAsistencias(asist);
+ status("ASISTENCIA REGISTRADA: "+empleados[emp]);
+ cargarTabla();
+}
+
+function eliminar(i){
+ let asist = getAsistencias();
+ asist.splice(i,1);
+ saveAsistencias(asist);
+ cargarTabla();
+}
+
+function cargarTabla(){
+ let asist = getAsistencias();
+ let tbody = document.querySelector("#tabla tbody");
+ tbody.innerHTML="";
+ asist.forEach((a,i)=>{
+   let tr=document.createElement("tr");
+   tr.innerHTML=`<td>${a.id}</td><td>${a.nombre}</td><td>${a.fecha}</td><td>${a.hora}</td><td><button class='btn-danger' onclick='eliminar(${i})'>X</button></td>`;
+   tbody.appendChild(tr);
+ });
+}
+
+function status(t){
+ document.getElementById("statusCard").innerHTML = "<b>"+t+"</b>";
+}
+
+// ================= EXCEL =================
+function exportarExcel(){
+ let asist = getAsistencias();
+ let wb = XLSX.utils.book_new();
+ let ws = XLSX.utils.json_to_sheet(asist);
+ XLSX.utils.book_append_sheet(wb,ws,"ASISTENCIA");
+ XLSX.writeFile(wb,"REPORTE_ASISTENCIA.xlsx");
+}
+
+// ================= INIT =================
+if(!validarSesion()){}
+
+cargarTabla();
+
+let params = new URLSearchParams(window.location.search);
+let emp = params.get("emp");
+if(emp && empleados[emp]){
+ registrar(emp);
+}
+
 </script>
-
 </body>
 </html>
